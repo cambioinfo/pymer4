@@ -730,7 +730,7 @@ class Lmer(object):
         ran_vars.columns = ["Name", "Var", "Std"]
         ran_vars.index.name = None
         ran_vars.replace("NA", "", inplace=True)
-        ran_vars = ran_vars.applymap(
+        ran_vars = ran_vars.map(
             lambda x: np.nan if x == robjects.NA_Character else x
         )
         ran_vars.replace(np.nan, "", inplace=True)
@@ -741,7 +741,7 @@ class Lmer(object):
             ran_corrs.drop("grp", axis=1, inplace=True)
             ran_corrs.columns = ["IV1", "IV2", "Corr"]
             ran_corrs.index.name = None
-            ran_corrs = ran_corrs.applymap(
+            ran_corrs = ran_corrs.map(
                 lambda x: np.nan if x == robjects.NA_Character else x
             )
             ran_corrs.replace(np.nan, "", inplace=True)
@@ -1586,7 +1586,7 @@ class Lmer(object):
         nsim=500,
         boot_type="perc",
         quiet=False,
-        oldnames=False,
+        signamess=False,
         seed=None,
     ):
         """
@@ -1603,7 +1603,7 @@ class Lmer(object):
             nsim (int): number of bootstrap intervals if bootstrapped confidence intervals are requests; default 500
             boot_type (str): bootstrap confidence interval type (one of "perc","basic","norm", as defined in boot_ci in R)
             quiet (bool): (logical) suppress messages about computationally intensive profiling?
-            oldnames: (logical) use old-style names for variance-covariance parameters, e.g. ".sig01", rather than newer
+            signamess: (logical) use old-style names for variance-covariance parameters, e.g. ".sig01", rather than newer
              (more informative) names such as "sd_(Intercept)|Subject"?
             seed (int): seed to be passed to bootMer for repeatability.
 
@@ -1622,9 +1622,9 @@ class Lmer(object):
 
             >>> model.confint(method="boot", nsim=100, parm=["sd_(Intercept)|Group","sigma"])
 
-            Same as above but using oldnames for those variances, which is still the devault in lme4
+            Same as above but using signamess for those variances, which is still the devault in lme4
 
-            >>> model.confint(method="boot", nsim=100, oldnames=True, parm=[".sig01",".sigma"])
+            >>> model.confint(method="boot", nsim=100, signamess=True, parm=[".sig01",".sigma"])
 
         """
 
@@ -1664,8 +1664,8 @@ class Lmer(object):
             + """'"""
             + """,quiet="""
             + ("""TRUE""" if quiet else """FALSE""")
-            + """,oldNames="""
-            + ("""TRUE""" if oldnames else """FALSE""")
+            + """,signames="""
+            + ("""TRUE""" if signamess else """FALSE""")
             + """))
             out_ci
             }"""
