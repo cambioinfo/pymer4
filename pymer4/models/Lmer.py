@@ -730,7 +730,7 @@ class Lmer(object):
         ran_vars.columns = ["Name", "Var", "Std"]
         ran_vars.index.name = None
         ran_vars.replace("NA", "", inplace=True)
-        ran_vars = ran_vars.applymap(
+        ran_vars = ran_vars.map(
             lambda x: np.nan if x == robjects.NA_Character else x
         )
         ran_vars.replace(np.nan, "", inplace=True)
@@ -741,7 +741,7 @@ class Lmer(object):
             ran_corrs.drop("grp", axis=1, inplace=True)
             ran_corrs.columns = ["IV1", "IV2", "Corr"]
             ran_corrs.index.name = None
-            ran_corrs = ran_corrs.applymap(
+            ran_corrs = ran_corrs.map(
                 lambda x: np.nan if x == robjects.NA_Character else x
             )
             ran_corrs.replace(np.nan, "", inplace=True)
@@ -1586,7 +1586,8 @@ class Lmer(object):
         nsim=500,
         boot_type="perc",
         quiet=False,
-        oldnames=False,
+        signamess=False,
+        seed=None,
     ):
         """
         Compute confidence intervals on the parameters of a Lmer object (this is a wrapper for confint.merMod in lme4).
@@ -1602,8 +1603,9 @@ class Lmer(object):
             nsim (int): number of bootstrap intervals if bootstrapped confidence intervals are requests; default 500
             boot_type (str): bootstrap confidence interval type (one of "perc","basic","norm", as defined in boot_ci in R)
             quiet (bool): (logical) suppress messages about computationally intensive profiling?
-            oldnames: (logical) use old-style names for variance-covariance parameters, e.g. ".sig01", rather than newer
+            signamess: (logical) use old-style names for variance-covariance parameters, e.g. ".sig01", rather than newer
              (more informative) names such as "sd_(Intercept)|Subject"?
+            seed (int): seed to be passed to bootMer for repeatability.
 
         Returns:
             pd.DataFrame: confidence intervals for the parameters of interest
@@ -1620,9 +1622,9 @@ class Lmer(object):
 
             >>> model.confint(method="boot", nsim=100, parm=["sd_(Intercept)|Group","sigma"])
 
-            Same as above but using oldnames for those variances, which is still the devault in lme4
+            Same as above but using signamess for those variances, which is still the devault in lme4
 
-            >>> model.confint(method="boot", nsim=100, oldnames=True, parm=[".sig01",".sigma"])
+            >>> model.confint(method="boot", nsim=100, signamess=True, parm=[".sig01",".sigma"])
 
         """
 
@@ -1654,6 +1656,7 @@ class Lmer(object):
             + method
             + """'"""
             + ((""",zeta=""" + str(zeta)) if zeta is not None else """""")
+            + ((""",seed=""" + str(seed)) if seed is not None else """""")
             + """,nsim="""
             + str(nsim)
             + """,boot.type='"""
@@ -1661,8 +1664,8 @@ class Lmer(object):
             + """'"""
             + """,quiet="""
             + ("""TRUE""" if quiet else """FALSE""")
-            + """,oldNames="""
-            + ("""TRUE""" if oldnames else """FALSE""")
+            + """,signames="""
+            + ("""TRUE""" if signamess else """FALSE""")
             + """))
             out_ci
             }"""
@@ -1676,3 +1679,45 @@ class Lmer(object):
         for message in r_console:
             print(message)
         return out_summary
+
+    def cooks_distance(
+        self,
+    ):
+        """
+        Compute Cook's distance for a Lmer object. Specifically, we use cooks.distance(influence(x) as discussed in 
+       https://github.com/lme4/lme4/issues/693
+        Args:
+            self (Lmer): the Lmer object for which confidence intervals should be computed
+
+        Returns:
+            np.array: Cook's distances
+
+        Examples:
+            The following examples demonstrate how to retrieve Cook's distances.
+
+             >>> model.cooks_distances()
+
+        """
+
+        # record messages going to screen
+        r_console = []
+
+        def _f(x):
+            r_console.append(x)
+
+        callbacks.consolewrite_warnerror = _f
+         # Model cooks distances
+        rstring = """
+            function(model){
+            out <- cooks.distance(influence(model))
+            out
+            }
+        """
+        cooks_func = robjects.r(rstring)
+        cooks_dist = np.array(cooks_func(self.model_obj))
+
+        # restore outputs
+        callbacks.consolewrite_warnerror = consolewrite_warning_backup
+        for message in r_console:
+            print(message)
+        return cooks_dist
